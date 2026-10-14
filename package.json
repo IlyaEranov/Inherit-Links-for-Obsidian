@@ -1,0 +1,19 @@
+{
+  "name": "inherit-links",
+  "version": "0.1.0",
+  "main": "main.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc && cpx manifest.json ../test-plugins/.obsidian/plugins/inherit-links"
+  },
+  "keywords": [],
+  "author": "Orpheus228",
+  "license": "ISC",
+  "devDependencies": {
+    "cpx": "^1.5.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "obsidian": "^1.14.4"
+  }
+}
