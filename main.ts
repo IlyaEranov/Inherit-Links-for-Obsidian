@@ -45,6 +45,7 @@ export default class InheriPlugin extends Plugin{
         const body = clearRawBody(raw)
         const seen = new Set<string>()
         const wantedNames: string[] = []
+        const targets: TFile[] = []
         const blocked: TFile[] = []
         let nameFound = false
 
@@ -69,6 +70,7 @@ export default class InheriPlugin extends Plugin{
             }
 
             wantedNames.push(`[[${name}]]`)
+            targets.push(target)
         }
 
         if(!nameFound) return
@@ -81,10 +83,41 @@ export default class InheriPlugin extends Plugin{
 
         if(wantedNames.length === 0) return
 
+        for(const t of targets) await this.ensureChildLine(t, f)
+
         const current = this.rawParents(f)
         if(current.length === wantedNames.length && current.every((e, i) => e === wantedNames[i])) return
 
         await this.app.fileManager.processFrontMatter(f, (fm) => fm[PARENT_TAG] = wantedNames)
+    }
+
+    private async ensureChildLine(parentFile: TFile, child: TFile){
+        const line = `@#[[${child.basename}]]`
+
+        const has = (text: string) => {
+            for(const m of clearRawBody(text).matchAll(CHILD_RE)){
+                if(m[1] && this.app.metadataCache.getFirstLinkpathDest(m[1].trim(), parentFile.path)?.path === child.path) return true
+            }
+            return false
+        }
+
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+        if(view?.file?.path === parentFile.path) {
+            const editor = view.editor
+            if(has(editor.getValue())) return
+            const last = editor.lastLine()
+            const tail = editor.getLine(last)
+            editor.replaceRange((tail === "" ? "" : "\n") + line + "\n", {line: last, ch: tail.length})
+            return
+        }
+
+        if(has(await this.app.vault.cachedRead(parentFile))) return
+
+        await this.app.vault.process(parentFile, (data) => {
+            if(has(data)) return data
+            const base = data.replace(/\s*$/, "")
+            return base + (base === "" ? "" : "\n") + line + "\n"
+        })
     }
 
     private async onCreated(newFile: TFile){
