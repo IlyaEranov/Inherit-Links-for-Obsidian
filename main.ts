@@ -1,18 +1,32 @@
-import { getLinkpath, MarkdownView, Notice, Plugin, TFile } from "obsidian"
+import { App, getLinkpath, MarkdownView, normalizePath, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian"
 
 const PARENT_TAG = "parent"
 const PARENT_RE = /(?<![\p{L}\p{N}_])@\[\[([^\[\]|#^]+)(?:[#^|][^\[\]]*)?\]\]/gu
 const CHILD_RE = /(?<![\p{L}\p{N}_])@#\[\[([^\[\]|#^]+)(?:[#^|][^\[\]]*)?\]\]/gu
 
+interface InheritSettings{
+    sameFolder: boolean
+}
+
+const DEFAUL_SETTINGS: InheritSettings = {
+    sameFolder: false
+}
+
+const mask = (s: string) => s.replace(/[^\n]/g, " ")
+
 const clearRawBody = (s: string) => s
-    .replace(/^---\r?\n[\s\S]*?\r?\n---/, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`[^`\n]*`/g, "")
+    .replace(/^---\r?\n[\s\S]*?\r?\n---/, mask)
+    .replace(/```[\s\S]*?```/g, mask)
+    .replace(/`[^`\n]*`/g, mask)
 
 export default class InheriPlugin extends Plugin{
+    settings: InheritSettings = {...DEFAUL_SETTINGS}
     private timers = new Map<string, number>()
     
     async onload(){
+        await this.loadSettings()
+        this.addSettingTab(new InheriSettingTab(this.app, this))
+
         this.registerEvent(
             this.app.vault.on("modify", (f) => {
                 if(f instanceof TFile && f.extension === "md") this.schedule(f)
@@ -30,6 +44,14 @@ export default class InheriPlugin extends Plugin{
 
     onunload(): void {
         this.timers.forEach((t) => window.clearTimeout(t))
+    }
+
+    async loadSettings(){
+        this.settings = Object.assign({}, DEFAUL_SETTINGS, await this.loadData())
+    }
+
+    async saveSettings(){
+        await this.saveData(this.settings)
     }
 
     private schedule(f: TFile, delay = 1000){
@@ -124,7 +146,8 @@ export default class InheriPlugin extends Plugin{
 
         await new Promise((r) => window.setTimeout(r, 300))
 
-        const parents: TFile[]  = []
+        const childrens: TFile[] = []
+        const parents: TFile[] = []
         const cache = this.app.metadataCache
 
         for(const f of this.app.vault.getMarkdownFiles()){
@@ -137,19 +160,28 @@ export default class InheriPlugin extends Plugin{
             
             for(const m of body.matchAll(CHILD_RE)){
                 if(m[1] && cache.getFirstLinkpathDest(m[1].trim(), f.path)?.path === newFile.path){
-                    if(!parents.includes(f)) parents.push(f)
+                    parents.push(f)
                     break
                 }
             }
 
             for(const m of body.matchAll(PARENT_RE)){
                 if(m[1] && cache.getFirstLinkpathDest(m[1].trim(), f.path)?.path === newFile.path){
-                    this.schedule(f, 300)
+                    childrens.push(f)
                     break
                 }
             }
         }
 
+        if(parents.length === 0 && childrens.length === 0) return
+
+        const anchor = parents[0] ?? childrens[0]
+        if(this.settings.sameFolder && anchor){
+            await this.moveNextTo(newFile, anchor)
+        }
+
+        for(const f of  childrens) this.schedule(f, 300)
+        
         if(parents.length === 0) return
 
         await this.app.vault.process(newFile, (data) => {
@@ -168,6 +200,20 @@ export default class InheriPlugin extends Plugin{
 
             return data.replace(/\s*$/, "") + "\n" + missing.map((e) => `@${e}`).join("\n") + "\n"
         })
+    }
+
+    private async moveNextTo(file: TFile, anchor: TFile){
+        const folder = anchor.parent
+        if(!folder || file.parent?.path === folder.path) return
+
+        const path = normalizePath(`${folder.path}/${file.name}`)
+        if(this.app.vault.getAbstractFileByPath(path)) return
+
+        try{
+            await this.app.fileManager.renameFile(file, path)
+        } catch (e){
+            console.error("Inherit Links: Не удалось перенести файл", e)
+        }
     }
 
     private rawParents(f: TFile): string[] {
@@ -199,5 +245,33 @@ export default class InheriPlugin extends Plugin{
             stack.push(...this.parentsOf(current))
         }
         return false
+    }
+}
+
+class InheriSettingTab extends PluginSettingTab{
+    plugin: InheriPlugin
+
+    constructor(app: App, plugin: InheriPlugin){
+        super(app, plugin)
+        this.plugin = plugin
+    }
+
+    display(): void {
+        const { containerEl } = this
+        containerEl.empty()
+
+        new Setting(containerEl)
+            .setName("Create a file in the source note folder")
+            .setDesc(
+                "When you click on @#[[Name]] the new file will appear in the parent's folder," + 
+                "when you click on @[[Name]], it appears in the child notes folder." + 
+                'If disabled, Obsidian selects the folder itself (setting "Location of new notes").'
+            )
+            .addToggle((t) => 
+                t.setValue(this.plugin.settings.sameFolder).onChange(async (v) => {
+                    this.plugin.settings.sameFolder = v
+                    await this.plugin.saveSettings()
+                })
+            )
     }
 }
