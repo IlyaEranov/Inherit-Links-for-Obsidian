@@ -4,7 +4,7 @@
   "main": "main.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc && cpx manifest.json ../test-plugins/.obsidian/plugins/inherit-links"
+    "build": "tsc && cpx manifest.json ../test-plugins/.obsidian/plugins/inherit-links && cpx styles.css ../test-plugin/.obsidian/plugins/inherit-links"
   },
   "keywords": [],
   "author": "Orpheus228",

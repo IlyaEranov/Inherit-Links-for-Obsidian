@@ -1,0 +1,38 @@
+.inherit-number {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 2.6em;
+  height: 1.8em;
+  margin-right: var(--size-4-2);
+  padding: 0 var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.inherit-number.is-root {
+  color: var(--text-accent);
+  border-color: var(--background-modifier-border-hover);
+  border-color: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+}
+
+.nav-file-title:hover .inherit-number:not(.is-root),
+.nav-file-title.is-active .inherit-number:not(.is-root) {
+  color: var(--text-normal);
+  border-color: var(--background-modifier-border-hover);
+}
+
+.inherit-sorted {
+  display: flex;
+  flex-direction: column;
+}

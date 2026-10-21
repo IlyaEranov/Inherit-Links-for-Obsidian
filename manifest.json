@@ -1,7 +1,7 @@
 {
     "id": "inherit-links",
     "name": "Inherit Links",
-    "version": "0.3",
+    "version": "0.4.3.f",
     "minAppVersion": "1.4.0",
     "description": "Adds inheritance to links (parent --> child). The @ symbol is used to operate the plugin, an example of the construction is @[[Name]].",
     "author": "Orpheus228",
